@@ -1,13 +1,43 @@
 # ============================================================
 # shell-setup: common tmux configuration
-# Installed at: ~/.config/shell-setup/tmux.conf.common
-#
-# These bindings use the normal tmux prefix (default: Ctrl-b).
-# Example: Ctrl-b, then h/j/k/l to move between panes.
 # ============================================================
 
-# vi-style pane navigation
+
+# ============================================================
+# Mouse
+# ============================================================
+
+set -g mouse on
+
+
+# ============================================================
+# Copy mode
+# ============================================================
+
+set -g mode-keys vi
+
+
+# ============================================================
+# Pane movement: vi style
+# Prefix + h/j/k/l
+# ============================================================
+
 bind h select-pane -L
 bind j select-pane -D
 bind k select-pane -U
 bind l select-pane -R
+
+
+# ============================================================
+# Mouse wheel scrollback
+# ============================================================
+
+bind -n WheelUpPane \
+    if-shell -F '#{pane_in_mode}' \
+        'send-keys -X -N 3 scroll-up' \
+        'copy-mode -e; send-keys -X -N 3 scroll-up'
+
+bind -n WheelDownPane \
+    if-shell -F '#{pane_in_mode}' \
+        'send-keys -X -N 3 scroll-down' \
+        ''
