@@ -1,0 +1,67 @@
+# ============================================================
+# shell-setup: common Bash configuration
+# Installed at: ~/.config/shell-setup/bashrc.common
+#
+# Keep machine-specific settings (ROS, CUDA, proxy, conda, etc.)
+# in the machine's existing ~/.bashrc. This file is intentionally
+# limited to portable interactive-shell conveniences.
+# ============================================================
+
+# ------------------------------
+# History
+# ------------------------------
+HISTSIZE=50000
+HISTFILESIZE=100000
+HISTCONTROL=ignoreboth
+
+shopt -s histappend
+shopt -s cmdhist
+
+# Make commands entered in one terminal visible to other Bash terminals.
+# Preserve any pre-existing PROMPT_COMMAND used by ROS/conda/tools/prompts.
+__shell_setup_history_sync() {
+    builtin history -a
+    builtin history -n
+}
+
+if declare -p PROMPT_COMMAND 2>/dev/null | grep -q '^declare -a'; then
+    _shell_setup_history_hook_found=0
+    for _shell_setup_cmd in "${PROMPT_COMMAND[@]}"; do
+        if [[ "$_shell_setup_cmd" == "__shell_setup_history_sync" ]]; then
+            _shell_setup_history_hook_found=1
+            break
+        fi
+    done
+    if [[ $_shell_setup_history_hook_found -eq 0 ]]; then
+        PROMPT_COMMAND+=("__shell_setup_history_sync")
+    fi
+    unset _shell_setup_history_hook_found _shell_setup_cmd
+else
+    if [[ "${PROMPT_COMMAND:-}" != *"__shell_setup_history_sync"* ]]; then
+        PROMPT_COMMAND="__shell_setup_history_sync${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+    fi
+fi
+
+# ------------------------------
+# bash-completion
+# ------------------------------
+# Ubuntu may already load bash-completion from ~/.bashrc or /etc/bash.bashrc.
+# Load it only when it is not already active.
+if ! declare -p BASH_COMPLETION_VERSINFO >/dev/null 2>&1; then
+    if ! shopt -oq posix; then
+        if [[ -f /usr/share/bash-completion/bash_completion ]]; then
+            . /usr/share/bash-completion/bash_completion
+        elif [[ -f /etc/bash_completion ]]; then
+            . /etc/bash_completion
+        fi
+    fi
+fi
+
+# ------------------------------
+# fzf defaults
+# ------------------------------
+# The fzf shell integration itself is sourced by the managed block in
+# ~/.bashrc. These variables only define the default UI behavior.
+: "${FZF_DEFAULT_OPTS:=--height=50% --layout=reverse --border --info=inline}"
+: "${FZF_CTRL_R_OPTS:=--height=60% --layout=reverse --border}"
+export FZF_DEFAULT_OPTS FZF_CTRL_R_OPTS

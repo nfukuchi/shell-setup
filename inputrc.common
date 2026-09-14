@@ -1,0 +1,23 @@
+# ============================================================
+# shell-setup: GNU Readline settings
+# This content is inserted inside a managed block in ~/.inputrc.
+# ============================================================
+
+# Prefix-aware history search:
+#   type "ssh 192" then Up/Down to browse only matching history entries.
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+# TAB cycles completion candidates; Shift-TAB goes backwards.
+"\C-i": menu-complete
+"\e[Z": menu-complete-backward
+
+# Completion behavior.
+set completion-ignore-case on
+set completion-map-case on
+set show-all-if-ambiguous on
+set menu-complete-display-prefix on
+
+# Color completion candidates when supported by Readline/terminal.
+set colored-stats on
+set colored-completion-prefix on
