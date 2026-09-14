@@ -65,3 +65,18 @@ fi
 : "${FZF_DEFAULT_OPTS:=--height=50% --layout=reverse --border --info=inline}"
 : "${FZF_CTRL_R_OPTS:=--height=60% --layout=reverse --border}"
 export FZF_DEFAULT_OPTS FZF_CTRL_R_OPTS
+
+# ------------------------------
+# Terminal/TUI scroll behavior
+# ------------------------------
+
+# Claude Code:
+# alternate screenを使わず、tmux/native scrollbackを使えるようにする
+export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
+
+# Vim:
+# 既存 ~/.vimrc はそのまま読み込みつつ、mouse=a を追加
+# 既に vim alias/function がある場合は上書きしない
+if [[ "$(type -t vim 2>/dev/null || true)" == "file" ]]; then
+    alias vim='vim -c "set mouse=a"'
+fi
