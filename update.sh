@@ -87,11 +87,14 @@ for required in install.sh update.sh bashrc.common inputrc.common tmux.conf.comm
         exit 1
     }
 done
-[[ -x "$TMP_DIR/repo/install.sh" ]] || {
-    echo 'ERROR: Latest repository install.sh is not executable.' >&2
+# Do not require the executable bit in Git. This repository may be edited or
+# cloned from Windows/WSL filesystems where the mode bit is not preserved in
+# the way users expect. Validate the script as Bash, then invoke it explicitly.
+if ! bash -n "$TMP_DIR/repo/install.sh"; then
+    echo 'ERROR: Latest repository install.sh has invalid Bash syntax.' >&2
     exit 1
-}
+fi
 
-"$TMP_DIR/repo/install.sh" --repo-url "$REPO_URL" "${PASS_ARGS[@]}"
+bash "$TMP_DIR/repo/install.sh" --repo-url "$REPO_URL" "${PASS_ARGS[@]}"
 printf '\nUpdate completed successfully.\n'
 printf 'If tmux is already running, reload it with:\n  tmux source-file ~/.tmux.conf\n'
