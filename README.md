@@ -1,27 +1,39 @@
 # shell-setup
 
-Portable Bash/Readline/fzf setup for Ubuntu/WSL/SSH Linux environments without replacing machine-specific `~/.bashrc` content.
+Portable Bash/Readline/fzf/tmux and CLI-tool setup for Ubuntu, WSL, and SSH Linux environments without replacing machine-specific configuration.
 
 ## What it changes
 
-- **Keeps the existing `~/.bashrc`** and preserves ROS, CUDA, conda, proxy, aliases, custom PATHs, etc.
-- Adds one clearly delimited managed block to `~/.bashrc`.
-- If `~/.inputrc` already exists, preserves it and replaces/adds only the managed block.
-- If `~/.inputrc` does **not** exist, creates it with `$include /etc/inputrc` first, then adds the managed settings.
+- Keeps the existing `~/.bashrc` and preserves ROS, CUDA, conda, proxy, aliases, custom PATHs, etc.
+- Adds/replaces only a clearly delimited managed block in `~/.bashrc`.
+- Preserves an existing `~/.inputrc`; if absent, creates one that first includes `/etc/inputrc`.
+- Preserves an existing `~/.tmux.conf`; if absent, creates a small loader file.
 - Creates timestamped backups under `~/.shell-setup-backup/` before every install/update.
-- Installs `bash-completion` through apt when missing.
-- Installs/updates the official [junegunn/fzf](https://github.com/junegunn/fzf) checkout in `~/.fzf` and prevents the upstream installer from editing `~/.bashrc` itself.
-- Copies the portable common files and `update.sh` to `~/.config/shell-setup/`, so the original downloaded Git clone can be deleted.
+- Installs core apt packages through a shared apt helper that repairs interrupted dpkg state first.
+- Installs/updates the official `junegunn/fzf` Git checkout in `~/.fzf`.
+- Runs `installers/*.sh` in filename order.
+- Copies portable common files, the apt helper, and `update.sh` to `~/.config/shell-setup/` so the original clone can be deleted.
 
-## Files in this repository
+## Repository layout
 
-- `install.sh` — initial install and safe merge/update engine.
-- `update.sh` — clones the latest repository to a temporary directory and invokes the latest `install.sh`.
-- `bashrc.common` — portable Bash history, bash-completion, and fzf option settings.
-- `inputrc.common` — Readline history/completion key bindings and display settings.
-- `tests/test.sh` — local regression tests; does not require sudo or network.
+```text
+shell-setup/
+├── install.sh
+├── update.sh
+├── bashrc.common
+├── inputrc.common
+├── tmux.conf.common
+├── lib/
+│   └── apt.sh
+├── installers/
+│   ├── 00-install_basics.sh
+│   └── 01-install_agents.sh
+├── tests/
+│   └── test.sh
+└── README.md
+```
 
-## Initial installation from Git
+## Initial installation
 
 ```bash
 git clone https://github.com/YOUR_NAME/YOUR_REPO.git ~/Downloads/shell-setup
@@ -29,11 +41,9 @@ cd ~/Downloads/shell-setup
 ./install.sh
 ```
 
-`install.sh` automatically remembers `git remote origin` for future updates. After success, the clone may be removed.
+`install.sh` automatically remembers `git remote origin`. After a successful installation, the downloaded clone may be removed.
 
-## Initial installation from ZIP/download
-
-If the directory is not a Git checkout, provide the repository URL once so that future updates know where to fetch from:
+If installing from a ZIP instead of Git, specify the repository URL once:
 
 ```bash
 ./install.sh --repo-url https://github.com/YOUR_NAME/YOUR_REPO.git
@@ -41,96 +51,195 @@ If the directory is not a Git checkout, provide the repository URL once so that 
 
 ## Updating later
 
-The installed updater does not depend on the original clone:
-
 ```bash
 ~/.config/shell-setup/update.sh
 ```
 
-It creates a temporary Git clone, runs the **latest** `install.sh`, then removes the clone automatically. Each update also backs up the current `.bashrc` and `.inputrc` first.
+The updater creates a temporary clone of the latest repository, executes its latest `install.sh`, and removes the temporary clone afterward. This means changes to `installers/*.sh`, `lib/apt.sh`, Bash settings, Readline settings, and tmux settings all arrive through the same update command.
 
-## Resulting layout
+## APT/dpkg recovery
+
+All project-owned apt installers should use the shared helper instead of writing raw `sudo apt install ...` commands.
+
+Example installer:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="${SHELL_SETUP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+. "$ROOT_DIR/lib/apt.sh"
+
+apt_install vim ffmpeg wget git tmux
+```
+
+`apt_install` performs the following sequence:
+
+1. Run `dpkg --configure -a` to finish an interrupted package transaction.
+2. If that fails because dependencies need repair, run `apt-get -f install -y`, then retry `dpkg --configure -a`.
+3. Run `apt-get update` once per shell-setup execution when packages are actually missing.
+4. Install only missing packages with `apt-get install -y`.
+5. Run the dpkg repair check again before returning.
+
+This specifically handles the common error:
 
 ```text
-~/.bashrc                          # existing environment-specific file, preserved
-~/.inputrc                         # existing file preserved, or created if absent
-~/.fzf/                            # official fzf Git checkout
-~/.fzf.bash                        # generated by fzf installer
+E: dpkg was interrupted, you must manually run 'sudo dpkg --configure -a' to correct the problem.
+```
+
+The top-level `install.sh` also runs `apt_repair` immediately before every `installers/*.sh` file, so an older/custom installer containing raw apt commands is protected from a pre-existing interrupted-dpkg state. New installers should still use `apt_install` because it is safer and reusable when the installer is run by itself.
+
+If a package's own post-install script is genuinely broken, the installer stops instead of hiding that real error.
+
+## Current installers
+
+### `installers/00-install_basics.sh`
+
+Installs:
+
+```text
+vim ffmpeg wget git git-lfs tmux tree zip unzip fd-find curl
+```
+
+It uses `apt_install`; do not add `sudo` yourself when adding packages to this list.
+
+For example:
+
+```bash
+apt_install \
+    vim \
+    ffmpeg \
+    jq \
+    ripgrep \
+    btop
+```
+
+### `installers/01-install_agents.sh`
+
+Installs Claude Code and Codex only when the corresponding command is not already available. User-level installers are used; `sudo` is not added.
+
+## Adding a new apt-based installer
+
+Create, for example:
+
+```text
+installers/02-install_robotics_tools.sh
+```
+
+with:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="${SHELL_SETUP_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+. "$ROOT_DIR/lib/apt.sh"
+
+apt_install \
+    v4l-utils \
+    can-utils \
+    minicom
+```
+
+Installers are executed lexicographically:
+
+```text
+00-install_basics.sh
+01-install_agents.sh
+02-install_robotics_tools.sh
+...
+```
+
+## Installed common files
+
+On normal Ubuntu/WSL:
+
+```text
 ~/.config/shell-setup/
 ├── bashrc.common
 ├── inputrc.common
+├── tmux.conf.common
+├── lib/
+│   └── apt.sh
 ├── update.sh
-└── repo-url                       # when Git origin/--repo-url is available
-~/.shell-setup-backup/
-└── YYYYMMDD-HHMMSS-PID/
-    ├── .bashrc                    # or .bashrc.WAS_ABSENT
-    └── .inputrc                   # or .inputrc.WAS_ABSENT
+└── repo-url
 ```
 
-## Managed blocks
-
-`install.sh` and `update.sh` modify only blocks delimited by:
-
-```text
-# >>> shell-setup >>>
-...
-# <<< shell-setup <<<
-```
-
-Anything outside those blocks is preserved. This is why lines such as the following remain untouched:
+Check from WSL:
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-export ROS_DOMAIN_ID=10
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export ROS_LOCALHOST_ONLY=0
-. "$HOME/.local/bin/env"
+ls -la ~/.config/shell-setup
+cat ~/.config/shell-setup/bashrc.common
 ```
 
-## Features
+Open in Windows Explorer:
 
-### Readline (`~/.inputrc`)
+```bash
+cd ~/.config/shell-setup
+explorer.exe .
+```
 
-- Type a prefix and press `Up` / `Down` to search history entries beginning with that prefix.
-- `Tab` cycles completion candidates.
-- `Shift-Tab` cycles backwards.
-- Case-insensitive and colored completion where supported.
+## tmux pane navigation
 
-### bash-completion
+`tmux.conf.common` contains:
 
-Provides command-aware completion, for example Git branches, SSH host aliases, systemd units, and many command-specific arguments.
+```tmux
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
+```
 
-### fzf
+With the default tmux prefix, use `Ctrl-b`, release it, then `h/j/k/l`.
 
-Official fzf shell integration provides fuzzy selection including:
+Reload an already-running tmux server with:
 
-- `Ctrl-R`: fuzzy command history search
+```bash
+tmux source-file ~/.tmux.conf
+```
+
+## Readline completion
+
+The managed `.inputrc` settings provide:
+
+- Prefix-aware `Up` / `Down` history search.
+- `Tab` to cycle completion candidates.
+- `Shift-Tab` to cycle backwards.
+- Case-insensitive/colored completion.
+- `set mark-directories off` so selecting a directory candidate does not immediately append `/` and change the next Tab completion context.
+
+## fzf
+
+Official fzf shell integration provides:
+
+- `Ctrl-R`: fuzzy history search
 - `Ctrl-T`: fuzzy file selection
-- `Alt-C`: fuzzy directory change
-- `**<Tab>`: fuzzy completion, including `ssh **<Tab>` from `/etc/hosts` and `~/.ssh/config`
+- `Alt-C`: fuzzy directory selection
+- `**<Tab>`: fuzzy completion
+
+## Useful options
+
+```text
+--skip-packages     Skip apt/dpkg package operations.
+--skip-fzf          Skip fzf install/update.
+--skip-installers   Skip installers/*.sh entirely.
+--repo-url URL      Set/save the repository used by update.sh.
+```
 
 ## Validation and rollback
 
-Before writing `.bashrc`, the merged file is checked with:
-
-```bash
-bash -n ~/.bashrc
-```
-
-The generated `.inputrc` is parsed by Readline before replacement. A final validation confirms exactly one managed block exists in each file.
-
-Backups are stored under:
+Before modifying files, backups are written to:
 
 ```text
 ~/.shell-setup-backup/YYYYMMDD-HHMMSS-PID/
 ```
 
-If an existing `~/.bashrc` or `~/.inputrc` is a symbolic link, the installer intentionally stops rather than modifying an unexpected target.
+The installer validates Bash and Readline configuration and loads tmux configuration on a private tmux server when tmux is available.
 
-## Run regression tests
+Run regression tests with:
 
 ```bash
 ./tests/test.sh
 ```
 
-The tests use temporary HOME directories and skip sudo/network-dependent installation steps.
+The regression tests include a simulated interrupted-dpkg condition and verify that `dpkg --configure -a` occurs before installer `apt-get install`.

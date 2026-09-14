@@ -10,12 +10,14 @@ usage() {
 Usage: update.sh [options]
 
 Fetch the latest shell-setup repository into a temporary directory and run
-its latest install.sh. The temporary clone is removed automatically.
+its latest install.sh. The temporary clone is removed automatically. The
+latest Bash, Readline, tmux, fzf, and installer settings are applied together.
 
 Options:
   --repo-url URL       Use and remember this repository URL.
   --skip-packages      Pass through to install.sh (mainly for testing).
   --skip-fzf           Pass through to install.sh (mainly for testing).
+  --skip-installers     Pass through to install.sh (mainly for testing).
   -h, --help           Show this help.
 
 Normally, after the first git-clone based installation, simply run:
@@ -30,7 +32,7 @@ while [[ $# -gt 0 ]]; do
             REPO_URL="$2"
             shift 2
             ;;
-        --skip-packages|--skip-fzf)
+        --skip-packages|--skip-fzf|--skip-installers)
             PASS_ARGS+=("$1")
             shift
             ;;
@@ -77,10 +79,19 @@ trap cleanup EXIT INT TERM
 printf 'Updating shell-setup from:\n  %s\n' "$REPO_URL"
 git clone --depth 1 "$REPO_URL" "$TMP_DIR/repo"
 
+# Fail before changing the user's environment if the fetched repository is
+# internally incomplete.
+for required in install.sh update.sh bashrc.common inputrc.common tmux.conf.common lib/apt.sh; do
+    [[ -f "$TMP_DIR/repo/$required" ]] || {
+        echo "ERROR: Latest repository is missing required file: $required" >&2
+        exit 1
+    }
+done
 [[ -x "$TMP_DIR/repo/install.sh" ]] || {
-    echo 'ERROR: Latest repository does not contain an executable install.sh.' >&2
+    echo 'ERROR: Latest repository install.sh is not executable.' >&2
     exit 1
 }
 
 "$TMP_DIR/repo/install.sh" --repo-url "$REPO_URL" "${PASS_ARGS[@]}"
 printf '\nUpdate completed successfully.\n'
+printf 'If tmux is already running, reload it with:\n  tmux source-file ~/.tmux.conf\n'

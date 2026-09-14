@@ -1,0 +1,13 @@
+# ============================================================
+# shell-setup: common tmux configuration
+# Installed at: ~/.config/shell-setup/tmux.conf.common
+#
+# These bindings use the normal tmux prefix (default: Ctrl-b).
+# Example: Ctrl-b, then h/j/k/l to move between panes.
+# ============================================================
+
+# vi-style pane navigation
+bind h select-pane -L
+bind j select-pane -D
+bind k select-pane -U
+bind l select-pane -R
