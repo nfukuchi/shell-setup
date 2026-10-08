@@ -118,6 +118,41 @@ apt_install \
 
 Installs Claude Code and Codex only when the corresponding command is not already available. User-level installers are used; `sudo` is not added.
 
+### `installers/04-configure_codex_sandbox.sh`
+
+Installs `bubblewrap` for the Codex Linux sandbox. When
+`kernel.apparmor_restrict_unprivileged_userns=1` (including Ubuntu 24.04),
+it also installs `apparmor-profiles` and `apparmor-utils`, copies the distribution's
+`bwrap-userns-restrict` profile into `/etc/apparmor.d/` if absent, and loads it
+with `apparmor_parser -r`. Existing profiles are preserved; repeated runs reload
+them. No global sysctl restrictions or Codex permission settings are changed.
+`--skip-packages` skips this entire installer, including profile configuration.
+Systems without the AppArmor restriction only need the bubblewrap package.
+If the distribution does not supply the extra profile, installation stops with
+an error rather than disabling AppArmor restrictions.
+
+This addresses `bwrap: setting up uid map: Permission denied` when the
+AppArmor user namespace restriction blocks sandbox creation. See the
+[official sandbox documentation](https://learn.chatgpt.com/docs/sandboxing).
+Run the installer through the normal `./install.sh` / update workflow, or alone:
+
+```bash
+bash installers/04-configure_codex_sandbox.sh
+```
+
+Validate from a normal host terminal (not inside another sandbox):
+
+```bash
+bwrap --unshare-user --ro-bind / / /usr/bin/true
+echo $?  # 0 means success
+```
+
+Nested sandbox creation can be denied even when the outer Codex sandbox works.
+Loading the profile requires sudo but does not require a reboot. To undo a profile
+newly created by this installer, unload it with
+`sudo apparmor_parser -R /etc/apparmor.d/bwrap-userns-restrict`, then remove that
+file. Do not remove a pre-existing, administrator-managed profile.
+
 ## Adding a new apt-based installer
 
 Create, for example:
