@@ -43,8 +43,9 @@ def validate_template(path: Path) -> str:
         raise SettingsError('Template exceeds 64 KiB')
     text = path.read_text(encoding='utf-8')
     parsed = tomllib.loads(text)
+    print(parsed)
     if parsed != EXPECTED or type(parsed['sandbox_workspace_write']['network_access']) is not bool:
-        raise SettingsError('Template must contain only never, workspace-write and network_access=false')
+        raise SettingsError('Template must contain only on-requet, workspace-write and network_access=true')
     return text
 
 

@@ -1,6 +1,6 @@
 # Run permitted workspace operations without approval prompts.
 # Denied operations remain denied; this does NOT disable the sandbox.
-approval_policy = "on_request"
+approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
