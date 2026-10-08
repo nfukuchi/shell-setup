@@ -7,7 +7,6 @@
 #   type "ssh 192" then Up/Down to browse only matching history entries.
 "\e[A": history-search-backward
 "\e[B": history-search-forward
-
 # TAB cycles completion candidates; Shift-TAB goes backwards.
 "\C-i": menu-complete
 "\e[Z": menu-complete-backward
@@ -21,7 +20,6 @@ set menu-complete-display-prefix on
 # Color completion candidates when supported by Readline/terminal.
 set colored-stats on
 set colored-completion-prefix on
-
 # Keep directories in the same TAB menu candidate set instead of appending '/'
 # immediately and changing completion context on the next TAB.
 set mark-directories off

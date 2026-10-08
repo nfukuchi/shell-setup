@@ -24,7 +24,8 @@ fi
 # This appearance-only installer does not install packages, including on dry-run.
 command -v python3 >/dev/null 2>&1 || skip 'python3 is missing; install it and rerun this installer'
 args=(--config "${SHELL_SETUP_WT_CONFIG:-$ROOT_DIR/windows-terminal.json}"
-      --profile "${SHELL_SETUP_WT_PROFILE:-$WSL_DISTRO_NAME}")
+      --profile "${SHELL_SETUP_WT_PROFILE:-$WSL_DISTRO_NAME}"
+      --palette-config "${SHELL_SETUP_PALETTE_CONFIG:-$ROOT_DIR/terminal-palette.json}")
 if [[ -n "${SHELL_SETUP_WT_PROFILE_GUID:-}" ]]; then
     args+=(--guid "$SHELL_SETUP_WT_PROFILE_GUID")
 fi

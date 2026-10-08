@@ -8,7 +8,6 @@ INPUTRC="$HOME/.inputrc"
 TMUX_CONF="$HOME/.tmux.conf"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="$HOME/.shell-setup-backup/${TIMESTAMP}-$$"
-
 BASH_BEGIN='# >>> shell-setup >>>'
 BASH_END='# <<< shell-setup <<<'
 INPUT_BEGIN='# >>> shell-setup >>>'
@@ -20,14 +19,12 @@ SKIP_PACKAGES=0
 SKIP_FZF=0
 REPO_URL="${SHELL_SETUP_REPO_URL:-}"
 SKIP_INSTALLERS=0
-
 # shellcheck source=lib/apt.sh
 . "$SCRIPT_DIR/lib/apt.sh"
 
 usage() {
     cat <<'USAGE'
 Usage: ./install.sh [options]
-
 Options:
   --repo-url URL       Save the Git repository URL for future update.sh runs.
                        Normally auto-detected from the current git checkout.
@@ -37,7 +34,6 @@ Options:
   -h, --help           Show this help.
 USAGE
 }
-
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --repo-url)
@@ -68,7 +64,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
 # Auto-detect origin when install.sh is run from a git clone.
 if [[ -z "$REPO_URL" ]] && git -C "$SCRIPT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     REPO_URL="$(git -C "$SCRIPT_DIR" remote get-url origin 2>/dev/null || true)"
@@ -79,7 +74,6 @@ log() { printf '%s\n' "$*"; }
 backup_one_config() {
     local file="$1"
     local name="$2"
-
     if [[ -L "$file" ]]; then
         echo "ERROR: $file is a symbolic link." >&2
         echo "To avoid modifying an unexpected target, this installer stops here." >&2
@@ -92,7 +86,6 @@ backup_one_config() {
         log "Recorded: $file did not exist"
     fi
 }
-
 backup_existing_configs() {
     mkdir -p "$BACKUP_DIR"
     backup_one_config "$BASHRC" '.bashrc'
@@ -112,7 +105,6 @@ strip_managed_block() {
         !skip       { print }
     ' "$src" > "$dst"
 }
-
 install_packages() {
     [[ "$SKIP_PACKAGES" -eq 1 ]] && { log '[1/9] Skipping core package installation.'; return; }
 
@@ -121,12 +113,10 @@ install_packages() {
         echo 'ERROR: This installer currently supports Debian/Ubuntu (apt).' >&2
         exit 1
     fi
-
     # apt_install repairs an interrupted dpkg transaction first, including the
     # common "dpkg was interrupted ... dpkg --configure -a" state.
-    apt_install git curl ca-certificates bash-completion tmux
+    apt_install git curl ca-certificates bash-completion tmux python3
 }
-
 install_shared_files() {
     log '[3/9] Installing shared configuration...'
     mkdir -p "$INSTALL_DIR"
@@ -136,7 +126,29 @@ install_shared_files() {
     install -m 0755 "$SCRIPT_DIR/update.sh" "$INSTALL_DIR/update.sh"
     mkdir -p "$INSTALL_DIR/lib"
     install -m 0755 "$SCRIPT_DIR/lib/apt.sh" "$INSTALL_DIR/lib/apt.sh"
-
+    # Keep the configuration-only tools usable after an update's temporary
+    # checkout has been removed. User config files are merged by each helper.
+    local item parent mode
+    local -a preferences_files=(
+        configure-terminal.sh configure-codex.sh
+        terminal-palette.json gnome-terminal.json windows-terminal.json codex-config.toml
+        lib/terminal_palette.py lib/gnome_terminal.py lib/windows_terminal.py
+        lib/toml_edit.py lib/codex_config.py
+        installers/02-configure_windows_terminal.sh
+        installers/03-configure_gnome_terminal.sh installers/04-configure_codex.sh
+        docs/dark-palette-codex-tmux.md PREFERENCES_VERSION
+    )
+    for item in "${preferences_files[@]}"; do
+        parent="$(dirname "$INSTALL_DIR/$item")"
+        if [[ -L "$INSTALL_DIR" || -L "$parent" || -L "$INSTALL_DIR/$item" ]]; then
+            echo "ERROR: Refusing a symlinked preferences destination: $INSTALL_DIR/$item" >&2
+            exit 1
+        fi
+        mkdir -p "$parent"
+        mode=0644
+        [[ "$item" == *.sh ]] && mode=0755
+        install -m "$mode" "$SCRIPT_DIR/$item" "$INSTALL_DIR/$item"
+    done
     if [[ -n "$REPO_URL" ]]; then
         printf '%s\n' "$REPO_URL" > "$INSTALL_DIR/repo-url"
         chmod 0600 "$INSTALL_DIR/repo-url"
@@ -148,14 +160,12 @@ install_shared_files() {
 
 install_fzf() {
     [[ "$SKIP_FZF" -eq 1 ]] && { log '[4/9] Skipping fzf installation/update.'; return; }
-
     log '[4/9] Installing/updating official fzf from GitHub...'
     if [[ -e "$HOME/.fzf" && ! -d "$HOME/.fzf/.git" ]]; then
         echo 'ERROR: ~/.fzf exists but is not a git checkout.' >&2
         echo 'Move or remove it manually before installing the official GitHub version.' >&2
         exit 1
     fi
-
     if [[ -d "$HOME/.fzf/.git" ]]; then
         local origin
         origin="$(git -C "$HOME/.fzf" remote get-url origin 2>/dev/null || true)"
@@ -170,7 +180,6 @@ install_fzf() {
     else
         git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf"
     fi
-
     # Generate ~/.fzf.bash with key bindings and fuzzy completion, but do not
     # let the upstream installer edit ~/.bashrc. Our managed block owns that.
     "$HOME/.fzf/install" --all --no-update-rc
@@ -178,7 +187,6 @@ install_fzf() {
 
 update_bashrc() {
     log '[5/9] Merging shell-setup into ~/.bashrc...'
-
     # If ~/.bashrc does not exist, create a safe minimal interactive Bash file.
     if [[ ! -e "$BASHRC" ]]; then
         cat > "$BASHRC" <<'BASHRC_EOF'
@@ -196,13 +204,11 @@ BASHRC_EOF
     trap 'rm -f "${tmp:-}"' RETURN
 
     strip_managed_block "$BASHRC" "$tmp" "$BASH_BEGIN" "$BASH_END"
-
     # Detect fzf integration already owned by the user's existing ~/.bashrc.
     local fzf_already_configured=0
     if grep -Eq '(\.fzf\.bash|fzf[[:space:]]+--bash|/fzf/shell/(key-bindings|completion)\.bash)' "$tmp"; then
         fzf_already_configured=1
     fi
-
     {
         printf '\n%s\n' "$BASH_BEGIN"
         printf '%s\n' '# Portable history/completion/fzf options managed by shell-setup.'
@@ -213,7 +219,6 @@ BASHRC_EOF
         fi
         printf '%s\n' "$BASH_END"
     } >> "$tmp"
-
     if ! bash -n "$tmp"; then
         echo 'ERROR: Merged ~/.bashrc failed bash -n validation; original file was not changed.' >&2
         exit 1
@@ -227,7 +232,6 @@ BASHRC_EOF
 
 update_inputrc() {
     log '[6/9] Merging shell-setup into ~/.inputrc...'
-
     # ~/.inputrc is often absent on a fresh Ubuntu installation. Create one
     # that inherits the distro-wide defaults before adding our managed block.
     if [[ ! -e "$INPUTRC" ]]; then
@@ -241,7 +245,6 @@ INPUTRC_EOF
     local tmp
     tmp="$(mktemp "$HOME/.inputrc.shell-setup.XXXXXX")"
     trap 'rm -f "${tmp:-}"' RETURN
-
     strip_managed_block "$INPUTRC" "$tmp" "$INPUT_BEGIN" "$INPUT_END"
 
     {
@@ -249,14 +252,12 @@ INPUTRC_EOF
         cat "$INSTALL_DIR/inputrc.common"
         printf '%s\n' "$INPUT_END"
     } >> "$tmp"
-
     # Parse with Readline before replacing the user's file. bind emits a
     # harmless warning in non-interactive mode, so suppress stderr here.
     if ! bash --noprofile --norc -c 'bind -f "$1"' _ "$tmp" 2>/dev/null; then
         echo 'ERROR: Merged ~/.inputrc failed Readline parsing; original file was not changed.' >&2
         exit 1
     fi
-
     chmod --reference="$INPUTRC" "$tmp" 2>/dev/null || chmod 0644 "$tmp"
     mv -f "$tmp" "$INPUTRC"
     trap - RETURN
@@ -265,7 +266,6 @@ INPUTRC_EOF
 
 update_tmux_conf() {
     log '[7/9] Merging shell-setup into ~/.tmux.conf...'
-
     # ~/.tmux.conf is often absent. Keep it as a small loader so machine-local
     # tmux settings outside our managed block remain untouched.
     if [[ ! -e "$TMUX_CONF" ]]; then
@@ -279,7 +279,6 @@ TMUX_EOF
     trap 'rm -f "${tmp:-}"' RETURN
 
     strip_managed_block "$TMUX_CONF" "$tmp" "$TMUX_BEGIN" "$TMUX_END"
-
     {
         printf '\n%s\n' "$TMUX_BEGIN"
         printf '%s\n' '# Portable tmux settings managed by shell-setup.'
@@ -292,7 +291,6 @@ TMUX_EOF
     trap - RETURN
     log 'Merged ~/.tmux.conf successfully.'
 }
-
 validate_tmux_conf() {
     # Use a private tmux socket/server so validation cannot affect an existing
     # interactive tmux server. When --skip-packages is used in a test machine
@@ -307,7 +305,6 @@ validate_tmux_conf() {
         tmux -L "$socket" kill-server >/dev/null 2>&1 || true
     fi
 }
-
 run_installers() {
     [[ "$SKIP_INSTALLERS" -eq 1 ]] && { log '[8/9] Skipping installers/*.sh.'; return; }
 
@@ -321,7 +318,6 @@ run_installers() {
             installers+=("$installer")
         done < <(find "$SCRIPT_DIR/installers" -maxdepth 1 -type f -name '*.sh' -print0 | sort -z)
     fi
-
     if [[ ${#installers[@]} -eq 0 ]]; then
         log 'No installers/*.sh files found; skipping.'
         return
@@ -332,7 +328,6 @@ run_installers() {
             echo "ERROR: Installer has invalid Bash syntax: $installer" >&2
             exit 1
         fi
-
         # Repair pending dpkg state before every installer. This protects even
         # an older/custom installer that still uses raw `sudo apt install ...`.
         if [[ "$SKIP_PACKAGES" -eq 0 ]]; then
@@ -343,7 +338,6 @@ run_installers() {
         echo '========================================'
         echo "Running: $(basename "$installer")"
         echo '========================================'
-
         SHELL_SETUP_ROOT="$SCRIPT_DIR" \
         SHELL_SETUP_SKIP_PACKAGES="$SKIP_PACKAGES" \
         bash "$installer"
@@ -355,7 +349,6 @@ final_validation() {
     bash -n "$BASHRC"
     bash --noprofile --norc -c 'bind -f "$1"' _ "$INPUTRC" 2>/dev/null
     validate_tmux_conf
-
     local bash_blocks input_blocks tmux_blocks
     bash_blocks="$(grep -Fxc "$BASH_BEGIN" "$BASHRC" || true)"
     input_blocks="$(grep -Fxc "$INPUT_BEGIN" "$INPUTRC" || true)"
@@ -363,7 +356,6 @@ final_validation() {
     [[ "$bash_blocks" == 1 ]] || { echo "ERROR: Expected exactly one managed block in ~/.bashrc, found $bash_blocks." >&2; exit 1; }
     [[ "$input_blocks" == 1 ]] || { echo "ERROR: Expected exactly one managed block in ~/.inputrc, found $input_blocks." >&2; exit 1; }
     [[ "$tmux_blocks" == 1 ]] || { echo "ERROR: Expected exactly one managed block in ~/.tmux.conf, found $tmux_blocks." >&2; exit 1; }
-
     [[ -f "$INSTALL_DIR/bashrc.common" ]]
     [[ -f "$INSTALL_DIR/inputrc.common" ]]
     [[ -f "$INSTALL_DIR/tmux.conf.common" ]]
@@ -371,7 +363,6 @@ final_validation() {
     [[ -x "$INSTALL_DIR/lib/apt.sh" ]]
     log 'Final validation: OK'
 }
-
 log '========================================'
 log ' shell-setup installer'
 log '========================================'
@@ -385,7 +376,6 @@ update_inputrc
 update_tmux_conf
 run_installers
 final_validation
-
 log
 log 'Installation completed successfully.'
 log "Backup: $BACKUP_DIR"

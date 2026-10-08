@@ -10,7 +10,7 @@ for arg in "$@"; do
                 '       bash configure-terminal.sh --restore BACKUP.json [--dry-run]' \
                 'Native backend: GNOME Terminal on Ubuntu Desktop (not Ptyxis or Console).' \
                 'Run in the Ubuntu desktop session as the intended user, without sudo.' \
-                'Configuration: gnome-terminal.json; see docs/terminal-appearance.md.'
+                'Configuration: gnome-terminal.json + terminal-palette.json; see docs/dark-palette-codex-tmux.md.'
             exit 0 ;;
     esac
 done
@@ -34,7 +34,8 @@ if ! gdbus call --timeout 5 --session --dest org.freedesktop.DBus \
     --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.GetId >/dev/null 2>&1; then
     skip 'desktop D-Bus session is not reachable'
 fi
-args=(--config "${SHELL_SETUP_GT_CONFIG:-$ROOT_DIR/gnome-terminal.json}")
+args=(--config "${SHELL_SETUP_GT_CONFIG:-$ROOT_DIR/gnome-terminal.json}"
+      --palette-config "${SHELL_SETUP_PALETTE_CONFIG:-$ROOT_DIR/terminal-palette.json}")
 [[ -z "${SHELL_SETUP_GT_PROFILE:-}" ]] || args+=(--profile "$SHELL_SETUP_GT_PROFILE")
 if [[ "${SHELL_SETUP_GT_DRY_RUN:-${SHELL_SETUP_TERMINAL_DRY_RUN:-0}}" == 1 ]]; then
     args+=(--dry-run)

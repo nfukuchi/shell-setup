@@ -11,7 +11,6 @@ else
     echo 'Installing Claude Code...'
     curl -fsSL https://claude.ai/install.sh | bash
 fi
-
 # Install Codex only when it is not already available.
 if command -v codex >/dev/null 2>&1; then
     echo "Codex already installed: $(codex --version 2>/dev/null || echo codex)"

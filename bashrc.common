@@ -6,7 +6,6 @@
 # in the machine's existing ~/.bashrc. This file is intentionally
 # limited to portable interactive-shell conveniences.
 # ============================================================
-
 # ------------------------------
 # History
 # ------------------------------
@@ -16,14 +15,12 @@ HISTCONTROL=ignoreboth
 
 shopt -s histappend
 shopt -s cmdhist
-
 # Make commands entered in one terminal visible to other Bash terminals.
 # Preserve any pre-existing PROMPT_COMMAND used by ROS/conda/tools/prompts.
 __shell_setup_history_sync() {
     builtin history -a
     builtin history -n
 }
-
 if declare -p PROMPT_COMMAND 2>/dev/null | grep -q '^declare -a'; then
     _shell_setup_history_hook_found=0
     for _shell_setup_cmd in "${PROMPT_COMMAND[@]}"; do
@@ -41,7 +38,6 @@ else
         PROMPT_COMMAND="__shell_setup_history_sync${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
     fi
 fi
-
 # ------------------------------
 # bash-completion
 # ------------------------------
@@ -56,7 +52,6 @@ if ! declare -p BASH_COMPLETION_VERSINFO >/dev/null 2>&1; then
         fi
     fi
 fi
-
 # ------------------------------
 # fzf defaults
 # ------------------------------
@@ -69,14 +64,15 @@ export FZF_DEFAULT_OPTS FZF_CTRL_R_OPTS
 # ------------------------------
 # Terminal/TUI scroll behavior
 # ------------------------------
-
 # Claude Code:
 # alternate screenを使わず、tmux/native scrollbackを使えるようにする
 export CLAUDE_CODE_DISABLE_ALTERNATE_SCREEN=1
 
 # Vim:
-# 既存 ~/.vimrc はそのまま読み込みつつ、mouse=a を追加
+# SHELL_SETUP_VIM_MOUSE=1 adds mouse=a; existing ~/.vimrc still loads.
 # 既に vim alias/function がある場合は上書きしない
-if [[ "$(type -t vim 2>/dev/null || true)" == "file" ]]; then
+# Opt in explicitly; otherwise leave mouse handling to the terminal/.vimrc.
+if [[ "${SHELL_SETUP_VIM_MOUSE:-0}" == 1 ]] &&
+   [[ "$(type -t vim 2>/dev/null || true)" == "file" ]]; then
     alias vim='vim -c "set mouse=a"'
 fi

@@ -12,7 +12,6 @@ Usage: update.sh [options]
 Fetch the latest shell-setup repository into a temporary directory and run
 its latest install.sh. The temporary clone is removed automatically. The
 latest Bash, Readline, tmux, fzf, and installer settings are applied together.
-
 Options:
   --repo-url URL       Use and remember this repository URL.
   --skip-packages      Pass through to install.sh (mainly for testing).
@@ -24,7 +23,6 @@ Normally, after the first git-clone based installation, simply run:
   ~/.config/shell-setup/update.sh
 USAGE
 }
-
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --repo-url)
@@ -47,12 +45,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
 # Prefer an explicit URL; otherwise use the URL remembered during install.
 if [[ -z "$REPO_URL" && -f "$INSTALL_DIR/repo-url" ]]; then
     REPO_URL="$(head -n 1 "$INSTALL_DIR/repo-url")"
 fi
-
 # If this copy of update.sh happens to be run from a live git checkout,
 # use that checkout's origin as a final fallback.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,7 +59,6 @@ fi
 if [[ -z "$REPO_URL" ]]; then
     cat >&2 <<'ERROR_EOF'
 ERROR: No shell-setup Git repository URL is known.
-
 If the first installation came from a ZIP/download instead of `git clone`, run:
   ~/.config/shell-setup/update.sh --repo-url https://github.com/USER/REPO.git
 
@@ -78,10 +73,14 @@ trap cleanup EXIT INT TERM
 
 printf 'Updating shell-setup from:\n  %s\n' "$REPO_URL"
 git clone --depth 1 "$REPO_URL" "$TMP_DIR/repo"
-
 # Fail before changing the user's environment if the fetched repository is
 # internally incomplete.
-for required in install.sh update.sh bashrc.common inputrc.common tmux.conf.common lib/apt.sh; do
+for required in install.sh update.sh bashrc.common inputrc.common tmux.conf.common lib/apt.sh \
+    configure-terminal.sh configure-codex.sh terminal-palette.json codex-config.toml \
+    gnome-terminal.json windows-terminal.json lib/terminal_palette.py lib/toml_edit.py \
+    lib/codex_config.py lib/gnome_terminal.py lib/windows_terminal.py \
+    installers/02-configure_windows_terminal.sh installers/03-configure_gnome_terminal.sh \
+    installers/04-configure_codex.sh docs/dark-palette-codex-tmux.md PREFERENCES_VERSION; do
     [[ -f "$TMP_DIR/repo/$required" ]] || {
         echo "ERROR: Latest repository is missing required file: $required" >&2
         exit 1
@@ -94,7 +93,6 @@ if ! bash -n "$TMP_DIR/repo/install.sh"; then
     echo 'ERROR: Latest repository install.sh has invalid Bash syntax.' >&2
     exit 1
 fi
-
 bash "$TMP_DIR/repo/install.sh" --repo-url "$REPO_URL" "${PASS_ARGS[@]}"
 printf '\nUpdate completed successfully.\n'
 printf 'If tmux is already running, reload it with:\n  tmux source-file ~/.tmux.conf\n'

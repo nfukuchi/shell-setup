@@ -1,0 +1,19 @@
+{
+    "name": "ShellSetup Dark",
+    "black": "#1E1E1E",
+    "red": "#F7768E",
+    "green": "#9ECE6A",
+    "yellow": "#E0AF68",
+    "blue": "#6EA8FF",
+    "purple": "#BB9AF7",
+    "cyan": "#7DCFFF",
+    "white": "#D3D7CF",
+    "brightBlack": "#7F849C",
+    "brightRed": "#FF9EAA",
+    "brightGreen": "#B9F27C",
+    "brightYellow": "#FFD580",
+    "brightBlue": "#9CCAFF",
+    "brightPurple": "#D2B0FF",
+    "brightCyan": "#A4E4FF",
+    "brightWhite": "#FFFFFF"
+}

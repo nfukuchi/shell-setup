@@ -6,7 +6,6 @@ unknown settings, BOM and newline conventions are retained. This module is
 platform-independent for testing; the Bash installer enforces WSL/SSH guards.
 """
 from __future__ import annotations
-
 import argparse
 import copy
 import difflib
@@ -21,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 import uuid
+from terminal_palette import load_palette, windows_scheme
 
 
 class SettingsError(ValueError):
@@ -29,7 +29,6 @@ class SettingsError(ValueError):
 
 class SelectionError(SettingsError):
     """The requested profile could not be selected unambiguously."""
-
 
 @dataclass
 class Node:
@@ -46,7 +45,6 @@ def reject_constant(value: str) -> None:
 
 class Jsonc:
     """Small span-preserving parser for JSON plus comments/trailing commas.
-
     Duplicate properties and other JSON5 extensions are deliberately rejected.
     Strings are parsed by Python's JSON decoder, not by comment-removal regexes.
     """
@@ -56,7 +54,6 @@ class Jsonc:
         self.text = text
         self.pos = 0
         self.decoder = json.JSONDecoder(parse_constant=reject_constant)
-
     def skip(self) -> None:
         while match := self.trivia.match(self.text, self.pos):
             self.pos = match.end()
@@ -67,7 +64,6 @@ class Jsonc:
         if self.pos != len(self.text):
             raise SettingsError(f"Unexpected content at character {self.pos}")
         return result
-
     def node(self, depth: int = 0) -> Node:
         if depth > 128:
             raise SettingsError("JSON nesting exceeds 128 levels")
@@ -84,7 +80,6 @@ class Jsonc:
             except ValueError as exc:
                 raise SettingsError(str(exc)) from exc
             return Node(start, self.pos, value)
-
         is_object = char == "{"
         closing = "}" if is_object else "]"
         values: Any = {} if is_object else []
@@ -125,7 +120,6 @@ class Jsonc:
         self.pos += 1
         return Node(start, self.pos, values, children, key_starts)
 
-
 def validate_appearance(data: Any) -> dict[str, Any]:
     allowed = {"colorScheme", "background", "opacity", "useAcrylic"}
     if not isinstance(data, dict) or not data or data.keys() - allowed:
@@ -141,7 +135,6 @@ def validate_appearance(data: Any) -> dict[str, Any]:
         raise SettingsError("useAcrylic must be true or false")
     return data
 
-
 def profile_list(root: Node) -> Node:
     if not isinstance(root.value, dict) or "profiles" not in root.children:
         raise SettingsError("Expected a top-level profiles property")
@@ -154,13 +147,11 @@ def profile_list(root: Node) -> Node:
         raise SettingsError("Every profile must be an object")
     return profiles
 
-
 def normalized_guid(value: Any) -> str:
     try:
         return str(uuid.UUID(str(value)))
     except (ValueError, AttributeError) as exc:
         raise SettingsError(f"Invalid profile GUID: {value!r}") from exc
-
 
 def choose_profile(root: Node, name: str, guid: str | None = None) -> tuple[int, Node]:
     entries = profile_list(root).children
@@ -179,9 +170,51 @@ def choose_profile(root: Node, name: str, guid: str | None = None) -> tuple[int,
         )
     return matches[0]
 
+def edit_object(text: str, node: Node, values: dict[str, Any]) -> str:
+    """Change only requested value spans; retain existing comments and other keys."""
+    edits = []
+    missing = {}
+    for key, value in values.items():
+        if key not in node.children:
+            missing[key] = value
+        elif type(node.value[key]) is not type(value) or node.value[key] != value:
+            child = node.children[key]
+            edits.append((child.start, child.end, json.dumps(value, ensure_ascii=False)))
+    if missing:
+        nl = "\r\n" if "\r\n" in text else "\n"
+        block = nl + ("," + nl).join(
+            "    " + json.dumps(k) + ": " + json.dumps(v, ensure_ascii=False)
+            for k, v in missing.items()) + ("," if node.children else "") + nl
+        edits.append((node.start + 1, node.start + 1, block))
+    for start, end, replacement in sorted(edits, reverse=True):
+        text = text[:start] + replacement + text[end:]
+    return text
+
+
+def upsert_scheme(text: str, scheme: dict[str, str]) -> tuple[str, list[Any]]:
+    root = Jsonc(text).parse()
+    if 'schemes' not in root.children:
+        return edit_object(text, root, {'schemes': [scheme]}), [scheme]
+    schemes = root.children['schemes']
+    if not isinstance(schemes.value, list) or any(not isinstance(n.value, dict) for n in schemes.children):
+        raise SettingsError('schemes must be an array of objects')
+    matches = [(i, n) for i, n in enumerate(schemes.children) if n.value.get('name') == scheme['name']]
+    if len(matches) > 1:
+        raise SettingsError('Duplicate managed color scheme name; resolve it before applying')
+    expected = copy.deepcopy(schemes.value)
+    if matches:
+        index, node = matches[0]
+        expected[index].update(scheme)
+        return edit_object(text, node, scheme), expected
+    nl = "\r\n" if "\r\n" in text else "\n"
+    block = nl + '    ' + json.dumps(scheme, ensure_ascii=False) + (',' if schemes.children else '') + nl
+    at = schemes.start + 1
+    expected.insert(0, scheme)
+    return text[:at] + block + text[at:], expected
+
 
 def update_text(text: str, appearance: dict[str, Any], name: str,
-                guid: str | None = None) -> tuple[str, dict[str, Any]]:
+                guid: str | None = None, palette: dict[str, str] | None = None) -> tuple[str, dict[str, Any]]:
     appearance = validate_appearance(appearance)
     root = Jsonc(text).parse()
     index, target = choose_profile(root, name, guid)
@@ -215,19 +248,24 @@ def update_text(text: str, appearance: dict[str, Any], name: str,
     if isinstance(expected_profiles, dict):
         expected_profiles = expected_profiles["list"]
     expected_profiles[index].update(appearance)
+    if palette is not None:
+        scheme = windows_scheme(palette, appearance.get('background', '#000000'))
+        if appearance.get('colorScheme') != scheme['name']:
+            raise SettingsError('colorScheme in the appearance config must match the shared palette name')
+        edited, expected['schemes'] = upsert_scheme(edited, scheme)
     if Jsonc(edited).parse().value != expected:
         raise SettingsError("Post-edit validation failed; original file was not modified")
     return edited, target.value
 
-
 def apply_file(path: Path, appearance: dict[str, Any], name: str,
-               guid: str | None = None, dry_run: bool = False) -> Path | None:
+               guid: str | None = None, dry_run: bool = False,
+               palette: dict[str, str] | None = None) -> Path | None:
     if path.is_symlink() or not path.is_file():
         raise SettingsError(f"Not a regular non-symlink settings file: {path}")
     original = path.read_bytes()
     has_bom = original.startswith(b"\xef\xbb\xbf")
     text = original.decode("utf-8-sig")
-    edited, target = update_text(text, appearance, name, guid)
+    edited, target = update_text(text, appearance, name, guid, palette)
     label = target.get("name", target.get("guid", name))
     print(f"Windows Terminal: settings={path}")
     print(f"Windows Terminal: profile={label}")
@@ -268,7 +306,6 @@ def apply_file(path: Path, appearance: dict[str, Any], name: str,
     print("Windows Terminal: UPDATED - reopen the target tab; restart Terminal if needed")
     return backup
 
-
 def find_settings(local_app_data: Path) -> list[Path]:
     candidates = [
         local_app_data / "Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json",
@@ -277,7 +314,6 @@ def find_settings(local_app_data: Path) -> list[Path]:
     ]
     return [path for path in candidates if path.is_file()]
 
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
@@ -285,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--local-app-data", type=Path)
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--profile", required=True)
+    parser.add_argument("--palette-config", type=Path)
     parser.add_argument("--guid")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
@@ -302,7 +339,8 @@ def main(argv: list[str] | None = None) -> int:
                       "SHELL_SETUP_WT_SETTINGS to the intended file's WSL path and rerun.")
                 return 0
             path = paths[0]
-        apply_file(path, appearance, args.profile, args.guid, args.dry_run)
+        palette = load_palette(args.palette_config) if args.palette_config else None
+        apply_file(path, appearance, args.profile, args.guid, args.dry_run, palette)
         return 0
     except SelectionError as exc:
         print(f"Windows Terminal: SKIP - {exc}")
@@ -310,7 +348,6 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, ValueError, RecursionError) as exc:
         print(f"Windows Terminal: ERROR - {exc}", file=sys.stderr)
         return 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

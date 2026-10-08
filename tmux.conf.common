@@ -2,7 +2,9 @@
 # Mouse
 # ============================================================
 
-set -g mouse on
+# Prefer native terminal drag-selection/copy. Prefix + m toggles mouse capture.
+set -g mouse off
+bind m set-option -g mouse \; display-message 'tmux mouse: #{?mouse,on,off}'
 
 # vi style in tmux copy mode
 set -g mode-keys vi
