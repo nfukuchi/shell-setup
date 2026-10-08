@@ -18,12 +18,12 @@ import uuid
 from toml_edit import EditError, merge_scalars
 
 CHANGES = {
-    ('approval_policy',): 'never',
+    ('approval_policy',): 'on-request',
     ('sandbox_mode',): 'workspace-write',
-    ('sandbox_workspace_write', 'network_access'): False,
+    ('sandbox_workspace_write', 'network_access'): True,
 }
-EXPECTED = {'approval_policy': 'never', 'sandbox_mode': 'workspace-write',
-            'sandbox_workspace_write': {'network_access': False}}
+EXPECTED = {'approval_policy': 'on-request', 'sandbox_mode': 'workspace-write',
+            'sandbox_workspace_write': {'network_access': True}}
 MAX_SIZE = 4 * 1024 * 1024
 
 
