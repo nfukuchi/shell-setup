@@ -12,6 +12,8 @@ set -s set-clipboard external
 # 外側の端末がOSC 52に対応していることをtmuxに伝える
 set -as terminal-features ',xterm-256color:clipboard'
 
+set -s copy-command 'wl-copy'
+
 # vi style in tmux copy mode
 set -g mode-keys vi
 

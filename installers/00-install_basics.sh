@@ -19,4 +19,6 @@ apt_install \
     zip \
     unzip \
     fd-find \
-    curl
+    curl \
+    wl-clipboard \
+    xclip
