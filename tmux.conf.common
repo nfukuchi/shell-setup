@@ -3,8 +3,14 @@
 # ============================================================
 
 # Prefer native terminal drag-selection/copy. Prefix + m toggles mouse capture.
-set -g mouse off
+set -g mouse on
 bind m set-option -g mouse \; display-message 'tmux mouse: #{?mouse,on,off}'
+
+# tmuxでコピーした内容を端末のクリップボードにも送る
+set -s set-clipboard external
+
+# 外側の端末がOSC 52に対応していることをtmuxに伝える
+set -as terminal-features ',xterm-256color:clipboard'
 
 # vi style in tmux copy mode
 set -g mode-keys vi
